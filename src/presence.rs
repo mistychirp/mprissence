@@ -83,15 +83,23 @@ impl Presence {
             .as_deref()
             .filter(|u| u.starts_with("https://") && u.len() <= 256)
             .or(cfg.fallback_image.as_deref().filter(|s| !s.is_empty()));
+        let mut assets = json!({});
         if let Some(image) = image {
             let hover = match &self.album {
                 Some(album) => album.clone(),
                 None => format!("via {}", self.player),
             };
-            activity["assets"] = json!({
-                "large_image": image,
-                "large_text": discord_text(&hover),
-            });
+            assets["large_image"] = json!(image);
+            assets["large_text"] = json!(discord_text(&hover));
+        }
+        if let Some(small) = cfg.small_image.as_deref().filter(|s| !s.is_empty()) {
+            assets["small_image"] = json!(small);
+            if let Some(text) = cfg.small_text.as_deref().filter(|s| !s.is_empty()) {
+                assets["small_text"] = json!(discord_text(text));
+            }
+        }
+        if assets.as_object().is_some_and(|o| !o.is_empty()) {
+            activity["assets"] = assets;
         }
 
         activity
@@ -142,7 +150,30 @@ mod tests {
         assert_eq!(a["assets"]["large_image"], "fallback");
         assert!(a.get("timestamps").is_none());
         let a = p.to_activity(&Config::default());
-        assert!(a["assets"].get("large_image").is_none());
+        assert!(a.get("assets").is_none());
+    }
+
+    #[test]
+    fn small_badge() {
+        let p = Presence {
+            player: "mpv".into(),
+            title: "Song".into(),
+            artist: None,
+            album: None,
+            art_url: Some("https://example.com/cover.jpg".into()),
+            playing: true,
+            start_ms: None,
+            end_ms: None,
+        };
+        let cfg = Config {
+            small_image: Some("nixos-logo".into()),
+            small_text: Some("Listening on Nix".into()),
+            ..Config::default()
+        };
+        let a = p.to_activity(&cfg);
+        assert_eq!(a["assets"]["large_image"], "https://example.com/cover.jpg");
+        assert_eq!(a["assets"]["small_image"], "nixos-logo");
+        assert_eq!(a["assets"]["small_text"], "Listening on Nix");
     }
 
     #[test]

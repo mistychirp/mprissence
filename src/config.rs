@@ -26,6 +26,14 @@ pub struct Config {
     /// Asset key or https URL shown when the track has no usable cover art.
     #[serde(default)]
     pub fallback_image: Option<String>,
+
+    /// Asset key or https URL for the small badge over the cover art.
+    #[serde(default)]
+    pub small_image: Option<String>,
+
+    /// Tooltip for the small badge.
+    #[serde(default)]
+    pub small_text: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Deserialize)]

@@ -21,3 +21,8 @@ show_paused = false
 # file:// paths). Either an https URL or the key of an image uploaded under
 # Rich Presence → Art Assets in the developer portal.
 # fallback_image = "logo"
+
+# Small badge over the cover art and its tooltip. Same rules as fallback_image:
+# an https URL or an Art Assets key.
+# small_image = "nixos-logo"
+# small_text = "Listening on Nix"
