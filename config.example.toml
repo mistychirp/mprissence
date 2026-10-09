@@ -1,9 +1,13 @@
 # ~/.config/mprissence/config.toml
 
 # Required. Create an application at https://discord.com/developers/applications
-# and paste its "Application ID" here. The application's name is what your
-# profile shows as "Listening to <name>".
+# and paste its "Application ID" here. Its name shows on the activity card,
+# and after "Listening to" when display = "name".
 client_id = "000000000000000000"
+
+# What follows "Listening to" in the member list: "artist" (default),
+# "title", or "name" (the Discord application's name).
+display = "artist"
 
 # Players to ignore. Matched case-insensitively as a substring of the MPRIS
 # bus name (org.mpris.MediaPlayer2.<name>) or the player's display name.

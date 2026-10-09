@@ -6,9 +6,13 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
-    /// Discord application ID. The application's name is what shows up as
-    /// "Listening to <name>".
+    /// Discord application ID. The application's name is the fallback for
+    /// "Listening to <name>" and is shown on the activity card.
     pub client_id: String,
+
+    /// What follows "Listening to" in the member list and status line.
+    #[serde(default)]
+    pub display: Display,
 
     /// Players to ignore, matched case-insensitively as a substring of the
     /// MPRIS bus name (e.g. "firefox") or the player's Identity.
@@ -22,6 +26,16 @@ pub struct Config {
     /// Asset key or https URL shown when the track has no usable cover art.
     #[serde(default)]
     pub fallback_image: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Display {
+    /// The Discord application's name.
+    Name,
+    #[default]
+    Artist,
+    Title,
 }
 
 impl Config {

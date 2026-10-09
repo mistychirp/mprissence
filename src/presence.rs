@@ -1,5 +1,7 @@
 use serde_json::{Value, json};
 
+use crate::config::{Config, Display};
+
 /// What we want Discord to show. Produced by the MPRIS side, consumed by the
 /// Discord side.
 #[derive(Debug, Clone)]
@@ -41,10 +43,16 @@ impl Presence {
     }
 
     /// Builds the `activity` object for Discord's SET_ACTIVITY command.
-    pub fn to_activity(&self, fallback_image: Option<&str>) -> Value {
+    pub fn to_activity(&self, cfg: &Config) -> Value {
         let mut activity = json!({
             "type": 2, // "Listening to"
             "details": discord_text(&self.title),
+            // Which field follows "Listening to": 0 name, 1 state, 2 details.
+            "status_display_type": match cfg.display {
+                Display::Name => 0,
+                Display::Artist if self.artist.is_some() => 1,
+                Display::Artist | Display::Title => 2,
+            },
         });
 
         let state = match (&self.artist, self.playing) {
@@ -74,7 +82,7 @@ impl Presence {
             .art_url
             .as_deref()
             .filter(|u| u.starts_with("https://") && u.len() <= 256)
-            .or(fallback_image.filter(|s| !s.is_empty()));
+            .or(cfg.fallback_image.as_deref().filter(|s| !s.is_empty()));
         if let Some(image) = image {
             let hover = match &self.album {
                 Some(album) => album.clone(),
@@ -129,10 +137,32 @@ mod tests {
             start_ms: None,
             end_ms: None,
         };
-        let a = p.to_activity(Some("fallback"));
+        let cfg = Config { fallback_image: Some("fallback".into()), ..Config::default() };
+        let a = p.to_activity(&cfg);
         assert_eq!(a["assets"]["large_image"], "fallback");
         assert!(a.get("timestamps").is_none());
-        let a = p.to_activity(None);
+        let a = p.to_activity(&Config::default());
         assert!(a["assets"].get("large_image").is_none());
+    }
+
+    #[test]
+    fn display_picks_status_field() {
+        let mut p = Presence {
+            player: "mpv".into(),
+            title: "Song".into(),
+            artist: Some("Artist".into()),
+            album: None,
+            art_url: None,
+            playing: true,
+            start_ms: None,
+            end_ms: None,
+        };
+        let with = |display| Config { display, ..Config::default() };
+        assert_eq!(p.to_activity(&with(Display::Name))["status_display_type"], 0);
+        assert_eq!(p.to_activity(&with(Display::Artist))["status_display_type"], 1);
+        assert_eq!(p.to_activity(&with(Display::Title))["status_display_type"], 2);
+        // No artist means no state field, so fall back to the title.
+        p.artist = None;
+        assert_eq!(p.to_activity(&with(Display::Artist))["status_display_type"], 2);
     }
 }

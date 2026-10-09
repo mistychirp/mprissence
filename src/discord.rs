@@ -146,7 +146,7 @@ async fn serve(
                 let activity = match &presence {
                     Some(p) => {
                         info!("now showing: {} — {}", p.title, p.artist.as_deref().unwrap_or("?"));
-                        p.to_activity(cfg.fallback_image.as_deref())
+                        p.to_activity(cfg)
                     }
                     None => {
                         info!("clearing activity");

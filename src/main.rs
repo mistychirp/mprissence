@@ -89,7 +89,7 @@ async fn output(cfg: Config, mut rx: watch::Receiver<Option<presence::Presence>>
     }
     loop {
         if let Some(p) = rx.borrow_and_update().clone() {
-            let activity = p.to_activity(cfg.fallback_image.as_deref());
+            let activity = p.to_activity(&cfg);
             println!("{}", serde_json::to_string_pretty(&activity).unwrap());
         } else {
             println!("(no activity)");
