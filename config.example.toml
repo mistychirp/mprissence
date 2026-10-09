@@ -1,0 +1,19 @@
+# ~/.config/mprissence/config.toml
+
+# Required. Create an application at https://discord.com/developers/applications
+# and paste its "Application ID" here. The application's name is what your
+# profile shows as "Listening to <name>".
+client_id = "000000000000000000"
+
+# Players to ignore. Matched case-insensitively as a substring of the MPRIS
+# bus name (org.mpris.MediaPlayer2.<name>) or the player's display name.
+# `busctl --user list | grep mpris` shows what's running.
+ignore = ["firefox", "chromium"]
+
+# Keep the presence up (without a progress bar) while paused.
+show_paused = false
+
+# Shown when a track has no https cover art (local players usually only give
+# file:// paths). Either an https URL or the key of an image uploaded under
+# Rich Presence → Art Assets in the developer portal.
+# fallback_image = "logo"
