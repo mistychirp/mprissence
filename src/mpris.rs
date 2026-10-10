@@ -1,10 +1,11 @@
 use std::collections::HashMap;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use log::{debug, info};
 use tokio::sync::watch;
+use tokio::time::{Instant, sleep_until};
 use zbus::fdo::{DBusProxy, PropertiesProxy};
 use zbus::names::{BusName, InterfaceName};
 use zbus::zvariant::{OwnedValue, Value};
@@ -17,6 +18,19 @@ const BUS_PREFIX: &str = "org.mpris.MediaPlayer2.";
 const OBJECT_PATH: &str = "/org/mpris/MediaPlayer2";
 const ROOT_IFACE: &str = "org.mpris.MediaPlayer2";
 const PLAYER_IFACE: &str = "org.mpris.MediaPlayer2.Player";
+
+/// Some players (Deezer) announce a new track while Position keeps counting
+/// from the previous one, and only reset it once the new track has buffered
+/// (up to a second or two later, without a signal). Until then we assume the
+/// track started at the change and poll at this interval...
+const STALE_RECHECK: Duration = Duration::from_millis(250);
+/// ...giving up and trusting the player after this long.
+const STALE_WINDOW: Duration = Duration::from_secs(5);
+/// Start times this close together are the same clock.
+const SAME_START_MS: u64 = 1500;
+/// Position changes never emit signals, and not every player sends Seeked,
+/// so re-read playing players this often to catch drift.
+const RESYNC_INTERVAL: Duration = Duration::from_secs(10);
 
 #[derive(Debug)]
 struct Player {
@@ -31,6 +45,19 @@ struct Player {
     /// When this player last started playing or changed track; the most
     /// recent one wins when several are playing.
     last_active: Instant,
+    /// When to re-read this player even without a signal.
+    recheck_at: Option<Instant>,
+    /// Set after a track change while Position may still be the old track's.
+    stale: Option<StalePosition>,
+}
+
+#[derive(Debug)]
+struct StalePosition {
+    /// The previous track's start time; a position still counting from it is stale.
+    old_start_ms: u64,
+    /// When the new track was announced, used as its start in the meantime.
+    assumed_start_ms: u64,
+    until: Instant,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -66,6 +93,7 @@ pub async fn run(cfg: Config, tx: watch::Sender<Option<Presence>>) -> Result<()>
     publish(&cfg, &players, &tx);
 
     loop {
+        let next_recheck = players.values().filter_map(|p| p.recheck_at).min();
         tokio::select! {
             Some(change) = owner_changes.next() => {
                 let args = change.args()?;
@@ -88,6 +116,15 @@ pub async fn run(cfg: Config, tx: watch::Sender<Option<Presence>>) -> Result<()>
                 for (suffix, player) in players.iter_mut().filter(|(_, p)| p.owner == sender.as_str()) {
                     if let Err(e) = refresh(&conn, suffix, player).await {
                         debug!("refreshing {suffix}: {e:#}");
+                    }
+                }
+            }
+            _ = sleep_until(next_recheck.unwrap_or_else(Instant::now)), if next_recheck.is_some() => {
+                let now = Instant::now();
+                for (suffix, player) in players.iter_mut().filter(|(_, p)| p.recheck_at.is_some_and(|t| t <= now)) {
+                    if let Err(e) = refresh(&conn, suffix, player).await {
+                        debug!("rechecking {suffix}: {e:#}");
+                        player.recheck_at = None;
                     }
                 }
             }
@@ -129,6 +166,8 @@ async fn add_player(
         start_ms: None,
         end_ms: None,
         last_active: Instant::now(),
+        recheck_at: None,
+        stale: None,
     };
     if let Err(e) = refresh(conn, &suffix, &mut player).await {
         debug!("refreshing {suffix}: {e:#}");
@@ -163,19 +202,47 @@ async fn refresh(conn: &Connection, suffix: &str, player: &mut Player) -> Result
         .unwrap_or_default();
     let track = parse_track(&metadata);
     let length_us = metadata.get("mpris:length").and_then(|v| as_u64(v));
-    let position_us = all.remove("Position").and_then(|v| as_u64(&v));
+    let position_us = match (all.remove("Position").and_then(|v| as_u64(&v)), length_us) {
+        // A position past the end can't be this track's.
+        (Some(pos), Some(len)) if len > 0 && pos > len => Some(0),
+        (pos, _) => pos,
+    };
+    // Timestamps only mean something while playing; a paused player's
+    // derived start time would drift and cause pointless updates.
+    let reported_start = position_us
+        .filter(|_| playing)
+        .map(|pos| now_ms.saturating_sub(pos / 1000));
 
-    if (playing && !player.playing) || track != player.track {
+    let track_changed = track != player.track;
+    if (playing && !player.playing) || track_changed {
         player.last_active = Instant::now();
     }
+    if track_changed && player.stale.is_none() {
+        player.stale = player.start_ms.map(|old_start_ms| StalePosition {
+            old_start_ms,
+            assumed_start_ms: now_ms,
+            until: Instant::now() + STALE_WINDOW,
+        });
+    }
+    let start_ms = match (&player.stale, reported_start) {
+        (Some(stale), Some(reported))
+            if Instant::now() < stale.until && reported.abs_diff(stale.old_start_ms) <= SAME_START_MS =>
+        {
+            Some(stale.assumed_start_ms)
+        }
+        _ => {
+            player.stale = None;
+            reported_start
+        }
+    };
+
+    player.recheck_at = playing.then(|| {
+        Instant::now() + if player.stale.is_some() { STALE_RECHECK } else { RESYNC_INTERVAL }
+    });
     player.playing = playing;
     player.paused = paused;
     player.track = track;
-    // Timestamps only mean something while playing; a paused player's
-    // derived start time would drift and cause pointless updates.
-    player.start_ms = position_us
-        .filter(|_| playing)
-        .map(|pos| now_ms.saturating_sub(pos / 1000));
+    player.start_ms = start_ms;
     player.end_ms = match (player.start_ms, length_us) {
         (Some(start), Some(len)) if len > 0 => Some(start + len / 1000),
         _ => None,
