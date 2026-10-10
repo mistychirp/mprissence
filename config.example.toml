@@ -22,6 +22,11 @@ show_paused = false
 # Rich Presence → Art Assets in the developer portal.
 # fallback_image = "logo"
 
+# The Deezer app only reports a track's main artist. With this on, the full
+# credits ("Post Malone, Swae Lee") are fetched from api.deezer.com, once per
+# track. Off by default since it makes network requests.
+# deezer_contributors = true
+
 # Small badge over the cover art and its tooltip. Same rules as fallback_image:
 # an https URL or an Art Assets key.
 # small_image = "nixos-logo"

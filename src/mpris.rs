@@ -12,6 +12,7 @@ use zbus::zvariant::{OwnedValue, Value};
 use zbus::{Connection, MatchRule, MessageStream};
 
 use crate::config::Config;
+use crate::deezer::Credits;
 use crate::presence::Presence;
 
 const BUS_PREFIX: &str = "org.mpris.MediaPlayer2.";
@@ -66,6 +67,7 @@ struct Track {
     artist: Option<String>,
     album: Option<String>,
     art_url: Option<String>,
+    url: Option<String>,
 }
 
 /// Watches the session bus for MPRIS players and publishes the presence of
@@ -82,6 +84,7 @@ pub async fn run(cfg: Config, tx: watch::Sender<Option<Presence>>) -> Result<()>
         .build();
     let mut signals = MessageStream::for_match_rule(rule, &conn, None).await?;
 
+    let (mut credits, mut lookups) = Credits::new();
     let mut players: HashMap<String, Player> = HashMap::new();
     for name in dbus.list_names().await? {
         let Some(suffix) = name.as_str().strip_prefix(BUS_PREFIX) else { continue };
@@ -90,7 +93,7 @@ pub async fn run(cfg: Config, tx: watch::Sender<Option<Presence>>) -> Result<()>
         let owner = owner.to_string();
         add_player(&conn, &cfg, &mut players, suffix, owner).await;
     }
-    publish(&cfg, &players, &tx);
+    publish(&cfg, &players, &mut credits, &tx);
 
     loop {
         let next_recheck = players.values().filter_map(|p| p.recheck_at).min();
@@ -128,9 +131,10 @@ pub async fn run(cfg: Config, tx: watch::Sender<Option<Presence>>) -> Result<()>
                     }
                 }
             }
+            Some(lookup) = lookups.recv() => credits.insert(lookup),
             else => anyhow::bail!("D-Bus signal streams ended"),
         }
-        publish(&cfg, &players, &tx);
+        publish(&cfg, &players, &mut credits, &tx);
     }
 }
 
@@ -259,7 +263,8 @@ fn parse_track(md: &HashMap<String, OwnedValue>) -> Option<Track> {
         .filter(|s| !s.trim().is_empty());
     let album = md.get("xesam:album").and_then(|v| as_string(v)).filter(|s| !s.trim().is_empty());
     let art_url = md.get("mpris:artUrl").and_then(|v| as_string(v)).filter(|s| !s.is_empty());
-    Some(Track { title, artist, album, art_url })
+    let url = md.get("xesam:url").and_then(|v| as_string(v)).filter(|s| !s.is_empty());
+    Some(Track { title, artist, album, art_url, url })
 }
 
 /// Picks the player to show: the most recently active one that's playing,
@@ -274,13 +279,24 @@ fn select<'a>(cfg: &Config, players: &'a HashMap<String, Player>) -> Option<&'a 
     })
 }
 
-fn publish(cfg: &Config, players: &HashMap<String, Player>, tx: &watch::Sender<Option<Presence>>) {
+fn publish(
+    cfg: &Config,
+    players: &HashMap<String, Player>,
+    credits: &mut Credits,
+    tx: &watch::Sender<Option<Presence>>,
+) {
     let next = select(cfg, players).and_then(|p| {
         let track = p.track.clone()?;
+        let artist = track
+            .url
+            .as_deref()
+            .filter(|_| cfg.deezer_contributors)
+            .and_then(|url| credits.artists(url))
+            .or(track.artist);
         Some(Presence {
             player: p.identity.clone(),
             title: track.title,
-            artist: track.artist,
+            artist,
             album: track.album,
             art_url: track.art_url,
             playing: p.playing,

@@ -34,6 +34,11 @@ pub struct Config {
     /// Tooltip for the small badge.
     #[serde(default)]
     pub small_text: Option<String>,
+
+    /// Look up full artist credits for Deezer tracks via api.deezer.com,
+    /// since the Deezer app only reports the main artist over MPRIS.
+    #[serde(default)]
+    pub deezer_contributors: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Deserialize)]
