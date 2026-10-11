@@ -38,4 +38,4 @@ show_paused = false
 # Small badge over the cover art and its tooltip. Same rules as fallback_image:
 # an https URL or an Art Assets key.
 # small_image = "nixos-logo"
-# small_text = "Listening on Nix"
+# small_text = "Listening on Nix [{player}]"   # {player} = e.g. "Deezer"

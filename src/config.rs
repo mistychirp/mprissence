@@ -31,7 +31,7 @@ pub struct Config {
     #[serde(default)]
     pub small_image: Option<String>,
 
-    /// Tooltip for the small badge.
+    /// Tooltip for the small badge; `{player}` becomes the player's name.
     #[serde(default)]
     pub small_text: Option<String>,
 

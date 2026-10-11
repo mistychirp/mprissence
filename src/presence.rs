@@ -95,7 +95,8 @@ impl Presence {
         if let Some(small) = cfg.small_image.as_deref().filter(|s| !s.is_empty()) {
             assets["small_image"] = json!(small);
             if let Some(text) = cfg.small_text.as_deref().filter(|s| !s.is_empty()) {
-                assets["small_text"] = json!(discord_text(text));
+                let text = text.replace("{player}", &self.player);
+                assets["small_text"] = json!(discord_text(&text));
             }
         }
         if assets.as_object().is_some_and(|o| !o.is_empty()) {
@@ -167,13 +168,13 @@ mod tests {
         };
         let cfg = Config {
             small_image: Some("nixos-logo".into()),
-            small_text: Some("Listening on Nix".into()),
+            small_text: Some("Listening on Nix [{player}]".into()),
             ..Config::default()
         };
         let a = p.to_activity(&cfg);
         assert_eq!(a["assets"]["large_image"], "https://example.com/cover.jpg");
         assert_eq!(a["assets"]["small_image"], "nixos-logo");
-        assert_eq!(a["assets"]["small_text"], "Listening on Nix");
+        assert_eq!(a["assets"]["small_text"], "Listening on Nix [mpv]");
     }
 
     #[test]

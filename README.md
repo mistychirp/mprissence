@@ -153,7 +153,7 @@ The config file lives at `~/.config/mprissence/config.toml` (or
 | `show_paused` | `false` | Keep the activity up while paused (without the progress bar). |
 | `fallback_image` | none | Image used when a track has no usable cover art. An `https://` URL or an Art Assets key. |
 | `small_image` | none | Small badge over the cover art. An `https://` URL or an Art Assets key. |
-| `small_text` | none | Tooltip for the small badge. |
+| `small_text` | none | Tooltip for the small badge. `{player}` is replaced with the player's name, e.g. `"Listening on Linux [{player}]"` → "Listening on Linux [Deezer]". |
 | `deezer_contributors` | `false` | Fetch full artist credits for Deezer tracks from `api.deezer.com` (one request per track). |
 | `[navidrome]` | none | `server` and `cover_url`: map Navidrome cover links (e.g. from Feishin) to a public cover proxy. See [Album art](#album-art). |
 
