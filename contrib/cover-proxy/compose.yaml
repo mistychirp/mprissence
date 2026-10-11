@@ -1,0 +1,43 @@
+# Public, credential-free Navidrome cover proxy for mprissence, published with
+# Tailscale Funnel. Only GET /cover/<id> is answered; see README.md.
+name: mprissence-covers
+
+services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    hostname: ${TS_HOSTNAME:-covers}
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "true"
+    volumes:
+      - ./state:/var/lib/tailscale
+      - ./serve.json:/config/serve.json:ro
+    networks: [navidrome]
+    restart: unless-stopped
+
+  # Shares the tailscale container's network, so it's reachable only through
+  # Funnel and can talk to Navidrome over Navidrome's Docker network.
+  caddy:
+    image: caddy:2
+    network_mode: service:tailscale
+    environment:
+      ND_USER: ${ND_USER}
+      ND_TOKEN: ${ND_TOKEN}
+      ND_SALT: ${ND_SALT}
+      ND_UPSTREAM: ${ND_UPSTREAM:-navidrome:4533}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    # Caddy lives in tailscale's network namespace, which is replaced whenever
+    # that container restarts, so restart along with it.
+    depends_on:
+      tailscale:
+        condition: service_started
+        restart: true
+    restart: unless-stopped
+
+networks:
+  navidrome:
+    external: true
+    name: ${ND_NETWORK:-navidrome_default}

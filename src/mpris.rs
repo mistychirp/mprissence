@@ -12,6 +12,7 @@ use zbus::zvariant::{OwnedValue, Value};
 use zbus::{Connection, MatchRule, MessageStream};
 
 use crate::config::Config;
+use crate::covers;
 use crate::deezer::Credits;
 use crate::presence::Presence;
 
@@ -299,7 +300,7 @@ fn publish(
             title: track.title,
             artist,
             album: track.album,
-            art_url: track.art_url,
+            art_url: track.art_url.and_then(|url| covers::public_url(cfg, &url)),
             playing: p.playing,
             start_ms: p.start_ms,
             end_ms: p.end_ms,

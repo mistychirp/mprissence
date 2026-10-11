@@ -1,0 +1,20 @@
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	@cover path_regexp cover ^/cover/([A-Za-z0-9_-]+)$
+	handle @cover {
+		# The Navidrome login is added here, server-side; clients only ever
+		# see the cover ID.
+		rewrite * /rest/getCoverArt.view?id={re.cover.1}&size=512&u={$ND_USER}&t={$ND_TOKEN}&s={$ND_SALT}&v=1.16.1&c=mprissence-covers
+		reverse_proxy {$ND_UPSTREAM} {
+			header_down -Set-Cookie
+			header_down Cache-Control "public, max-age=604800"
+		}
+	}
+	handle {
+		respond 404
+	}
+}

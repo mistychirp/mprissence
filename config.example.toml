@@ -27,6 +27,14 @@ show_paused = false
 # track. Off by default since it makes network requests.
 # deezer_contributors = true
 
+# Navidrome covers come with your login in the URL and usually point at a
+# LAN address, so mprissence won't pass them to Discord. If you run a public
+# cover proxy (see contrib/cover-proxy), map them to it; only the cover ID
+# is sent.
+# [navidrome]
+# server = "http://192.168.1.61:4533"   # as your player (e.g. Feishin) uses it
+# cover_url = "https://covers.your-tailnet.ts.net/cover/{id}"
+
 # Small badge over the cover art and its tooltip. Same rules as fallback_image:
 # an https URL or an Art Assets key.
 # small_image = "nixos-logo"

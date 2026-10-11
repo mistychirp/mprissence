@@ -1,4 +1,5 @@
 mod config;
+mod covers;
 mod deezer;
 mod discord;
 mod mpris;

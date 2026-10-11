@@ -39,6 +39,20 @@ pub struct Config {
     /// since the Deezer app only reports the main artist over MPRIS.
     #[serde(default)]
     pub deezer_contributors: bool,
+
+    /// Serve Navidrome covers through a public, credential-free proxy.
+    #[serde(default)]
+    pub navidrome: Option<Navidrome>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Navidrome {
+    /// Server address as your player uses it, e.g. "http://192.168.1.61:4533".
+    pub server: String,
+    /// Public cover URL with an `{id}` placeholder, e.g.
+    /// "https://covers.example.ts.net/cover/{id}".
+    pub cover_url: String,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Deserialize)]
@@ -70,6 +84,11 @@ impl Config {
             toml::from_str(&text).with_context(|| format!("parsing config {}", path.display()))?;
         if cfg.client_id.is_empty() || !cfg.client_id.bytes().all(|b| b.is_ascii_digit()) {
             bail!("client_id must be the numeric application ID from https://discord.com/developers/applications");
+        }
+        if let Some(nd) = &cfg.navidrome
+            && (!nd.cover_url.starts_with("https://") || !nd.cover_url.contains("{id}"))
+        {
+            bail!("navidrome.cover_url must be an https:// URL containing {{id}}");
         }
         Ok(cfg)
     }

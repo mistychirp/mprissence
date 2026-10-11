@@ -155,6 +155,7 @@ The config file lives at `~/.config/mprissence/config.toml` (or
 | `small_image` | none | Small badge over the cover art. An `https://` URL or an Art Assets key. |
 | `small_text` | none | Tooltip for the small badge. |
 | `deezer_contributors` | `false` | Fetch full artist credits for Deezer tracks from `api.deezer.com` (one request per track). |
+| `[navidrome]` | none | `server` and `cover_url`: map Navidrome cover links (e.g. from Feishin) to a public cover proxy. See [Album art](#album-art). |
 
 Example:
 
@@ -173,10 +174,31 @@ rebuild restarts it for you.)
 
 ### Album art
 
-Discord can only show cover art from `https://` URLs. Streaming players
-like Spotify and Deezer usually provide one; local players like mpv or
-Elisa usually only have a `file://` path, which mprissence won't upload
-anywhere. For those, `fallback_image` is shown instead.
+Discord's servers download the cover themselves, so it has to be a public
+`https://` URL. Streaming players like Spotify and Deezer usually provide one.
+Others don't:
+
+- **Local players and browsers** (mpv, Elisa, Firefox, Chromium) only have a
+  `file://` path, which mprissence won't upload anywhere. `fallback_image` is
+  shown instead.
+- **Self-hosted servers** (Navidrome via Feishin and other Subsonic clients,
+  Jellyfin, Plex) usually point at a LAN address and put your login in the
+  URL. mprissence never passes URLs with credentials (`u`/`t`/`s`, `api_key`,
+  `X-Plex-Token`, …) to Discord.
+
+For Navidrome, [`contrib/cover-proxy`](contrib/cover-proxy) is a small
+proxy you can run next to your server. It publishes covers at
+`https://<host>/cover/<id>` without your login. Point the `[navidrome]`
+section at it:
+
+```toml
+[navidrome]
+server = "http://192.168.1.61:4533"   # exactly as your player uses it
+cover_url = "https://covers.example.ts.net/cover/{id}"
+```
+
+`cover_url` can be any URL that serves the image for `{id}`, so you can use
+your own proxy instead.
 
 ## Usage
 
