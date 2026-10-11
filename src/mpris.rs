@@ -29,9 +29,10 @@ const STALE_RECHECK: Duration = Duration::from_millis(250);
 const STALE_WINDOW: Duration = Duration::from_secs(5);
 /// Start times this close together are the same clock.
 const SAME_START_MS: u64 = 1500;
-/// Position changes never emit signals, and not every player sends Seeked,
-/// so re-read playing players this often to catch drift.
-const RESYNC_INTERVAL: Duration = Duration::from_secs(10);
+/// Position changes never emit signals, and not every player sends Seeked
+/// (Deezer doesn't), so re-read playing players this often to catch seeks.
+/// It's one local D-Bus call; Discord only hears about drift past SAME_START_MS.
+const RESYNC_INTERVAL: Duration = Duration::from_secs(2);
 
 #[derive(Debug)]
 struct Player {
